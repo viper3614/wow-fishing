@@ -8,6 +8,7 @@ import org.opencv.imgproc.Imgproc;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -25,7 +26,7 @@ public class Main {
     public static final String filePath = "E:\\wowTempImg\\";
     public static int imageCount = 1;
     public static int findFloatCount = 1;
-    public static int loopCount = 100;
+    public static int loopCount = 350;
     // 设定要截取的屏幕区域
     public static Rectangle screenRect = new Rectangle(990, 20, 1700, 1200); // x, y, width, height
 
@@ -39,9 +40,13 @@ public class Main {
     public static ExecutorService executor = new ThreadPoolExecutor(3, 3, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<>(10), new FinshThreadFactory());
 
 
+    private static long start = System.currentTimeMillis();
+
     public static void main(String[] args) throws Exception {
         Robot robot = new Robot();
         cleanFiles(null);
+        Thread.sleep(1000);
+        keyClick(robot, KeyEvent.VK_Q);
         Thread.sleep(3000);
         for (; loopCount >= 0; loopCount--) {
             System.out.println("======================开始第" + loopCount + "次======================");
@@ -68,12 +73,38 @@ public class Main {
             } else {
                 mouseClick(robot, InputEvent.BUTTON3_DOWN_MASK);
             }
-//            executor.submit(new FishTask(filePath + loopCount));
             int s = new Random().nextInt(4000) + 1000;
             Thread.sleep(s);
+            calcTime(robot);
             System.out.println("======================结束第" + loopCount + "次======================\r\n");
         }
 
+    }
+
+    public static long tenMinutes = 600000l;
+
+    public static void calcTime(Robot robot) {
+        executor.submit(() -> {
+            long currented = System.currentTimeMillis();
+            long spend = currented - start;
+            if (spend > tenMinutes) {
+                try {
+                    Thread.sleep(1000);
+                    keyClick(robot, KeyEvent.VK_Q);
+                    Thread.sleep(2000);
+                    start = currented;
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+
+    public static void keyClick(Robot robot, int keyCode) {
+        System.out.println("press key -> Q:" + keyCode);
+        robot.keyPress(keyCode);
+        robot.delay(100);
+        robot.keyRelease(keyCode);
     }
 
 
@@ -244,7 +275,8 @@ public class Main {
         maxVal = mmr.maxVal;
         minLoc = mmr.minLoc; // 最小值是最佳匹配位置
         // 如果匹配值足够小（即匹配度高），则认为找到了物体,注意：这里的阈值0.1是一个示例值，需要根据实际情况调整
-        if (minVal < 0.012) {
+        System.out.println("detectObject() minVal:" + minVal);
+        if (minVal < 0.022) {
             // 返回匹配到的物体的左上角点,如果需要中心点，可以计算得到：(minLoc.x + templateImage.width() / 2, minLoc.y + templateImage.height() / 2)
             maxLoc = new Point((int) (minLoc.x + templateImage.width() / 2), (int) (minLoc.y + templateImage.height() / 2));
             return maxLoc;
