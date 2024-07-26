@@ -14,31 +14,38 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author viper
  * @create 2024-07-25-12:01
  */
 public class Main {
+    public static ExecutorService executor = new ThreadPoolExecutor(3, 3, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<>(10), new FinshThreadFactory());
+    public static Rectangle screenRect = new Rectangle(990, 20, 1700, 1200); // x, y, width, height
+    // 设定要截取的屏幕区域
+    public static LinkedList<Mat> mats = new LinkedList<>();
+    public static Map<Integer, Integer> levelMap = new LinkedHashMap<>();
+    private static long start = System.currentTimeMillis();
     public static final String filePath = "E:\\wowTempImg\\";
     public static int findFloatCount = 1;
     public static int loopCount = 100;
     public static long tenMinutes = 600000l;
     public static long executeHours = 2;
-    // 设定要截取的屏幕区域
-    public static Rectangle screenRect = new Rectangle(990, 20, 1700, 1200); // x, y, width, height
-    public static LinkedList<Mat> mats = new LinkedList<>();
-    public static Map<Integer, Integer> levelMap = new LinkedHashMap<>();
-    public static ExecutorService executor = new ThreadPoolExecutor(3, 3, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<>(10), new FinshThreadFactory());
-    private static long start = System.currentTimeMillis();
+    public static Mat cutImtemplateImg;
 
-    // 调用OpenCV库文件
+
     static {
+        new Mat();
+        // 调用OpenCV库文件
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+
         Mat cutImtemplateImg3 = Imgcodecs.imread("D:\\Develop-Application\\Idea-projects\\wow-fishing\\src\\main\\resources\\floatsuccess3.png");
+        cutImtemplateImg = Imgcodecs.imread("D:\\Develop-Application\\Idea-projects\\wow-fishing\\src\\main\\resources\\floatstart3.png");
         mats.add(cutImtemplateImg3);
         levelMap.put(1, 1);
         levelMap.put(115, 2);
@@ -52,19 +59,26 @@ public class Main {
         levelMap.put(425, 12);
     }
 
-    public static void init() {
+    public static void init(Robot robot) throws Exception {
         long expectTime = executeHours * 60 * 60 * 1000;
         loopCount = Math.round((float) expectTime / 9000);
         System.out.println("init() loopCount: " + loopCount);
-    }
 
-    public static void main(String[] args) throws Exception {
-        init();
-        Robot robot = new Robot();
-        cleanFiles(null);
         Thread.sleep(1000);
         keyClick(robot, KeyEvent.VK_Q);
         Thread.sleep(3000);
+
+        FishTask fishTask = new FishTask(filePath);
+        executor.submit(fishTask);
+    }
+
+    public static void main(String[] args) throws Exception {
+        Robot robot = new Robot();
+        init(robot);
+        exec(robot);
+    }
+
+    private static void exec(Robot robot) throws Exception {
         for (; loopCount >= 0; loopCount--) {
             System.out.println("======================开始第" + loopCount + "次======================");
             //设置鼠标初始坐标位置
@@ -246,8 +260,6 @@ public class Main {
     /**
      * 通过OpenCV识别鱼漂位置
      */
-    static Mat cutImtemplateImg = Imgcodecs.imread("D:\\Develop-Application\\Idea-projects\\wow-fishing\\src\\main\\resources\\floatstart3.png");
-
     private static Point compareWithFloat(int loopCount, FishType type) {
         String path = filePath + loopCount + "\\";
         File file = new File(path);
