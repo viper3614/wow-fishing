@@ -14,9 +14,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.LinkedList;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author viper
@@ -24,25 +24,42 @@ import java.util.concurrent.*;
  */
 public class Main {
     public static final String filePath = "E:\\wowTempImg\\";
-    public static int imageCount = 1;
     public static int findFloatCount = 1;
-    public static int loopCount = 350;
+    public static int loopCount = 100;
+    public static long tenMinutes = 600000l;
+    public static long executeHours = 2;
     // 设定要截取的屏幕区域
     public static Rectangle screenRect = new Rectangle(990, 20, 1700, 1200); // x, y, width, height
-
     public static LinkedList<Mat> mats = new LinkedList<>();
+    public static Map<Integer, Integer> levelMap = new LinkedHashMap<>();
+    public static ExecutorService executor = new ThreadPoolExecutor(3, 3, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<>(10), new FinshThreadFactory());
+    private static long start = System.currentTimeMillis();
 
     // 调用OpenCV库文件
     static {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+        Mat cutImtemplateImg3 = Imgcodecs.imread("D:\\Develop-Application\\Idea-projects\\wow-fishing\\src\\main\\resources\\floatsuccess3.png");
+        mats.add(cutImtemplateImg3);
+        levelMap.put(1, 1);
+        levelMap.put(115, 2);
+        levelMap.put(135, 3);
+        levelMap.put(160, 4);
+        levelMap.put(190, 5);
+        levelMap.put(215, 6);
+        levelMap.put(295, 9);
+        levelMap.put(315, 10);
+        levelMap.put(354, 11);
+        levelMap.put(425, 12);
     }
 
-    public static ExecutorService executor = new ThreadPoolExecutor(3, 3, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<>(10), new FinshThreadFactory());
-
-
-    private static long start = System.currentTimeMillis();
+    public static void init() {
+        long expectTime = executeHours * 60 * 60 * 1000;
+        loopCount = Math.round((float) expectTime / 9000);
+        System.out.println("init() loopCount: " + loopCount);
+    }
 
     public static void main(String[] args) throws Exception {
+        init();
         Robot robot = new Robot();
         cleanFiles(null);
         Thread.sleep(1000);
@@ -73,16 +90,19 @@ public class Main {
             } else {
                 mouseClick(robot, InputEvent.BUTTON3_DOWN_MASK);
             }
+            calcTime(robot);
             int s = new Random().nextInt(4000) + 1000;
             Thread.sleep(s);
-            calcTime(robot);
             System.out.println("======================结束第" + loopCount + "次======================\r\n");
         }
-
     }
 
-    public static long tenMinutes = 600000l;
 
+    /**
+     * 每十分钟按一次q，清理截图文件目录
+     *
+     * @param robot
+     */
     public static void calcTime(Robot robot) {
         executor.submit(() -> {
             long currented = System.currentTimeMillis();
@@ -92,6 +112,8 @@ public class Main {
                     Thread.sleep(1000);
                     keyClick(robot, KeyEvent.VK_Q);
                     Thread.sleep(2000);
+                    FishTask fishTask = new FishTask(filePath);
+                    executor.submit(fishTask);
                     start = currented;
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -132,7 +154,7 @@ public class Main {
                     public FileVisitResult visitFile(Path file,
                                                      BasicFileAttributes attrs) throws IOException {
                         Files.delete(file);
-                        System.out.printf("文件被删除 : %s%n", file);
+                        System.out.printf("cleanFiles() 文件被删除 : %s%n", file);
                         return FileVisitResult.CONTINUE;
                     }
 
@@ -141,7 +163,7 @@ public class Main {
                     public FileVisitResult postVisitDirectory(Path dir,
                                                               IOException exc) throws IOException {
                         Files.delete(dir);
-                        System.out.printf("文件夹被删除: %s%n", dir);
+                        System.out.printf("cleanFiles() 文件夹被删除: %s%n", dir);
                         return FileVisitResult.CONTINUE;
                     }
                 }
@@ -160,11 +182,6 @@ public class Main {
      *
      * @param loopCount
      */
-    static {
-        Mat cutImtemplateImg3 = Imgcodecs.imread("D:\\Develop-Application\\Idea-projects\\wow-fishing\\src\\main\\resources\\floatsuccess3.png");
-        mats.add(cutImtemplateImg3);
-    }
-
     private static boolean isRiseToTheBait(int loopCount) throws Exception {
         String type = "judge";
         int count = 40;
@@ -176,22 +193,7 @@ public class Main {
             Thread.sleep(50);
             Mat fishingImg = Imgcodecs.imread(filename);
             Future<Boolean> future = executor.submit(new FishIsSuccessTask(filename, count, mats));
-//            for (Mat mat : mats) {
-//                Core.MinMaxLocResult matchedImg = matchImg(fishingImg, mat);
-//                double minVal = matchedImg.minVal;
-//                System.out.println("isRiseToTheBait () minVal = " + minVal);
-//                if (minVal <= 0.01096) {
-//                    System.out.println("\r\nisRiseToTheBait() 上钩~~~");
-//                    total++;
-//                }
-//            }
-//            if (total >= 1) {
-//                System.out.println("\r\nisRiseToTheBait() 没有发现上钩,success次数:"+ total+",第几次："+ count);
-//                return true;
-//            }
             count--;
-            FishTask fishTask = new FishTask(filename);
-            executor.submit(fishTask);
             if (future.get()) {
                 return true;
             }
@@ -216,7 +218,7 @@ public class Main {
 
     private static void mouseClick(Robot robot, int type) {
         robot.mousePress(type);
-        robot.delay(100); // 等待一会儿
+        robot.delay(100);
         robot.mouseRelease(type);
     }
 
@@ -319,7 +321,7 @@ public class Main {
                 }
             }
             ImageIO.write(capturedImage, "jpg", imgFile);
-            System.out.printf("captureScreenRegion() %s的截图", type);
+            System.out.printf("captureScreenRegion() %s的截图\r\n", type);
         } catch (AWTException | IOException ex) {
             System.err.println(ex);
         }
