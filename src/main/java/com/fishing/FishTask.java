@@ -24,7 +24,7 @@ public class FishTask implements Callable<Boolean> {
     public Boolean call() throws Exception {
         Path rootPath = Paths.get(this.getFilepath());
         Files.walkFileTree(rootPath,
-                new SimpleFileVisitor<Path>() {
+                new SimpleFileVisitor<>() {
                     // 先去遍历删除文件
                     @Override
                     public FileVisitResult visitFile(Path file,

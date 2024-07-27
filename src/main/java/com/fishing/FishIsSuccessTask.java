@@ -1,21 +1,25 @@
 package com.fishing;
 
+import lombok.extern.slf4j.Slf4j;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
-import java.io.File;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author viper
  * @create 2024-07-26-0:22
  */
-public class FishIsSuccessTask implements Callable<Boolean> {
+@Slf4j
+public class FishIsSuccessTask implements Callable<Integer> {
     ThreadPoolExecutor executor = new ThreadPoolExecutor(6, 6, 10, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(20));
     List<Callable<Integer>> tasks = new LinkedList<Callable<Integer>>();
     private Mat sourceImage;
@@ -34,46 +38,25 @@ public class FishIsSuccessTask implements Callable<Boolean> {
         this.mats = mats;
     }
 
-    public FishIsSuccessTask(String filapath, int loopCount, LinkedList<Mat> mats, int times, int index, AtomicInteger successNum) {
-        this.filapath = filapath;
-        this.count = loopCount;
-        this.mats = mats;
-        this.times = times;
-        this.index = index;
-        this.successNum = successNum;
-    }
-
     @Override
-    public Boolean call() throws Exception {
+    public Integer call() {
         // 创建一个Mat对象来存储匹配结果
-        File file = new File(filapath);
-        File[] files = file.listFiles();
-        if (files == null || files.length == 0) {
-            return false;
+        Mat imread = Imgcodecs.imread(filapath);
+        Mat result = new Mat();
+        for (Mat mat : mats) {
+            SingleTask singleTask = new SingleTask(imread, mat, result, Imgproc.TM_SQDIFF_NORMED);
+            tasks.add(singleTask);
         }
-        int length = files.length;
-
-        for (int i = 0; i < length; i++) {
-            Mat imread = Imgcodecs.imread(files[i].getAbsolutePath());
-            Mat result = new Mat();
-            for (Mat mat : mats) {
-                SingleTask singleTask = new SingleTask(imread, mat, result, Imgproc.TM_SQDIFF_NORMED);
-                tasks.add(singleTask);
-            }
-        }
-        tasks.stream().forEach(task -> {
-            Future<Integer> submit = executor.submit(task);
+        tasks.forEach(task -> {
             try {
-                submit.get();
+                Integer taskRes = executor.submit(task).get();
+                successNum.addAndGet(taskRes);
             } catch (Exception e) {
-                e.printStackTrace();
+                log.error(e.getMessage());
             }
         });
-        System.out.printf("successNum.get():", successNum.get());
-        if (successNum.get() >= 8) {
-            return true;
-        }
-        return false;
+        log.info("FishIsSuccessTask.call() successNum.get():{}", successNum.get());
+        return successNum.get();
     }
 
     class SingleTask implements Callable<Integer> {
@@ -90,14 +73,16 @@ public class FishIsSuccessTask implements Callable<Boolean> {
         }
 
         @Override
-        public Integer call() throws Exception {
+        public Integer call() {
             Imgproc.matchTemplate(imread, mat, result, Imgproc.TM_SQDIFF_NORMED);
             Core.MinMaxLocResult mmr = Core.minMaxLoc(result);
             double minVal = mmr.minVal;
-            if (minVal <= 0.01110) {
+            log.info("FishIsSuccessTask filepath:{}, minVal:{}", filapath, minVal);
+            if (minVal <= 0.001689) {
+                log.info("FishIsSuccessTask match!filepath:{}, minVal:{}", filapath, minVal);
                 successNum.incrementAndGet();
             }
-            System.out.println("times:" + times + ",successNum:" + successNum);
+            log.info("FishIsSuccessTask.call() successNum:{}", successNum);
             return successNum.get();
         }
     }
