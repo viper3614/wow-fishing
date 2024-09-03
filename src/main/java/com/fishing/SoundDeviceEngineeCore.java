@@ -19,7 +19,7 @@ public class SoundDeviceEngineeCore {
      * 监听钓鱼时长
      */
     private static final int timePastSecond = 16;
-    private static final int dbthreshold = 75;
+    private static final int dbthreshold = 65;
 
     public SoundDeviceEngineeCore() throws Exception {
         log.info("SoundDeviceEngineeCore init...");
@@ -69,7 +69,7 @@ public class SoundDeviceEngineeCore {
         }
     }
 
-    public boolean startRecognize() throws Exception {
+    public boolean startRecognize() {
         targetDataLine.start();
         flag.set(true);
         byte[] fragment = new byte[4096];
@@ -88,6 +88,7 @@ public class SoundDeviceEngineeCore {
                 }
                 int read = targetDataLine.read(fragment, 0, fragment.length);
                 double db = bytesToDecibels(fragment, read);
+//                log.info("当前声音分贝:{}", db);
                 if (db > dbthreshold) {
                     log.info("检测到声音,当前声音分贝:{}", db);
                     count++;

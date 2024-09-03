@@ -59,7 +59,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>com.fishing.Main</mainClass>
+                            <mainClass>com.fishing.AutoFish</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
